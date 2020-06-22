@@ -1,0 +1,48 @@
+  
+---
+# file: roles/docker-compose/tasks/main.yml
+
+- name: Install docker packages
+  apt:
+    name: ['apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common']
+    state: present
+    update_cache: yes
+- name: Add Docker s official GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+- name: Verify that we have the key with the fingerprint
+  apt_key:
+    id: 0EBFCD88
+    state: present
+- name: Set up the stable repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+    state: present
+    update_cache: yes
+- name: Update apt packages
+  apt:
+    update_cache: yes
+- name: Install docker
+  apt:
+    name: docker-ce
+    state: present
+    update_cache: yes
+  #notify: Start docker on boot
+  #- name: enable a timer for dnf-automatic
+- name: Enable docker service
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+- name: Add remote "ubuntu" user to "docker" group
+  user:
+    name: "ubuntu"
+    group: "docker"
+    append: yes
+- name: Install docker-compose
+  get_url: 
+    url : https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-{{ docker_compose_os }}-{{ docker_compose_arch }}
+    dest: /usr/local/bin/docker-compose
+    mode: 'u+x,g+x,o+x'
+

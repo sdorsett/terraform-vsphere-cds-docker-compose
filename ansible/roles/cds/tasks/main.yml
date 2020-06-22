@@ -1,0 +1,65 @@
+  
+---
+# file: roles/cds/tasks/main.yml
+
+- name: Create a directory if it does not exist
+  file:
+    path: /home/ubuntu/cds/tools/smtpmock
+    state: directory
+    mode: '0755'
+- name: Download cds docker-compose.yml
+  get_url:
+    url: https://raw.githubusercontent.com/ovh/cds/master/docker-compose.yml
+    dest: /home/ubuntu/cds/docker-compose.yml
+    mode: '0755'
+- name: Pull down docker cds-engine image
+  shell: "docker pull ovhcom/cds-engine:latest"
+- name: Create PostgreSQL database, redis and elasticsearch containers 
+  shell: "docker-compose up --no-recreate -d cds-db cds-cache elasticsearch dockerhost"
+  args:
+    chdir: /home/ubuntu/cds/
+- name: sleep for 15 seconds and continue with play
+  wait_for:
+    timeout: 15
+  delegate_to: localhost
+- name: Ensure CDS database schema is up to date
+  shell: "docker-compose up --no-recreate cds-migrate"
+  args:
+    chdir: /home/ubuntu/cds/
+- name: Prepare initial CDS configuration.
+  shell: "docker-compose up cds-prepare"
+  args:
+    chdir: /home/ubuntu/cds/
+- name: Disable the CDS smtp server
+  shell: "export CDS_EDIT_CONFIG='api.smtp.disable=true' && docker-compose up cds-edit-config"
+  args:
+    chdir: /home/ubuntu/cds/
+- name: Start CDS API container
+  shell: "docker-compose up -d cds-api" 
+  args:
+    chdir: /home/ubuntu/cds/
+- name: Wait for port 8081 to become open on the host, don't start checking for 15 seconds
+  wait_for:
+    port: 8081
+    delay: 15
+- name: Download cdsctl
+  get_url:
+    url: http://localhost:8081/download/cdsctl/linux/amd64?variant=nokeychain
+    dest: /usr/local/bin/cdsctl
+    mode: '0755'
+- name: Sign up admin CDS user
+  shell: "TOKEN_CMD=$(docker logs cds_cds-prepare_1|grep TOKEN) && $TOKEN_CMD && /usr/local/bin/cdsctl signup --api-url http://localhost:8081 --email admin@localhost.local --username admin --fullname admin --password {{ cds_admin_password }} > cds_admin_created"
+  args:
+    chdir: /home/ubuntu/cds/
+    creates: /home/ubuntu/cds/cds_admin_created
+- name: Verify CDS admin user
+  shell: "VERIFY_CMD=$(docker-compose logs cds-api|grep 'cdsctl signup verify'|cut -d '$' -f2|xargs) && $VERIFY_CMD --file /home/ubuntu/.cdsrc --context default > cds_admin_verified"
+  args:
+    chdir: /home/ubuntu/cds/
+    creates: /home/ubuntu/cds/cds_admin_verified
+- name: Change ownership and permissions of /home/ubuntu/.cdsrc
+  file:
+    path: /home/ubuntu/.cdsrc
+    owner: ubuntu
+    group: docker
+    mode: '0644'

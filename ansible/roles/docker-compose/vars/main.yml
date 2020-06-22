@@ -1,0 +1,6 @@
+  
+---
+# file: roles/docker-compose/vars/main.yml
+docker_compose_version: 1.26.0
+docker_compose_os: linux
+docker_compose_arch: x86_64

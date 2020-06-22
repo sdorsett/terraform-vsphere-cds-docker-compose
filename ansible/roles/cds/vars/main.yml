@@ -1,0 +1,4 @@
+  
+---
+# file: roles/cds/vars/main.yml
+cds_admin_password: enter_your_super_secret_cds_password_here

@@ -1,0 +1,5 @@
+all:
+  children:
+    cds:
+      hosts:
+        cds.nested.lab:
